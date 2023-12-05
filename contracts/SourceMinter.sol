@@ -1,68 +1,71 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity ^0.8.20;
 
-import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
-import {IRouterClient} from "@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol";
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
-import {Withdraw} from "./utils/Withdraw.sol";
+import { IERC721Receiver } from "./interfaces/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import { IERC20 } from "./interfaces/IERC20.sol";
 
 /**
  * THIS IS AN EXAMPLE CONTRACT THAT USES HARDCODED VALUES FOR CLARITY.
  * THIS IS AN EXAMPLE CONTRACT THAT USES UN-AUDITED CODE.
  * DO NOT USE THIS CODE IN PRODUCTION.
  */
-contract SourceMinter is Withdraw {
-    enum PayFeesIn {
-        Native,
-        LINK
+contract SourceMinter is IERC721Receiver {
+    address immutable i_router;
+
+    struct NFTBridgeLocked {
+        uint tokenId;
+        uint originalGameId;
+        uint destinationGameId;
+        uint destinationChainSelector;
     }
 
-    address immutable i_router;
-    address immutable i_link;
+    event NFTBridgeInitiated(address indexed user, address indexed nftAddr, uint indexed tokenId, uint originalGameId, uint256 destinationGameId, uint destinationChainSelector);
+    event NFTBridgeUnLocked(address indexed user, address indexed nftAddr, uint indexed tokenId, uint256 originalGameId, uint256 destinationGameId);
 
-    event MessageSent(bytes32 messageId);
+    mapping(address => mapping(address => mapping(uint256 => NFTBridgeLocked))) public locked;
 
-    constructor(address router, address link) {
+    constructor(address router) {
         i_router = router;
-        i_link = link;
-        LinkTokenInterface(i_link).approve(i_router, type(uint256).max);
     }
 
     receive() external payable {}
 
-    function mint(
-        uint64 destinationChainSelector,
-        address receiver,
-        PayFeesIn payFeesIn
-    ) external {
-        Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-            receiver: abi.encode(receiver),
-            data: abi.encodeWithSignature("mint(address)", msg.sender),
-            tokenAmounts: new Client.EVMTokenAmount[](0),
-            extraArgs: "",
-            feeToken: payFeesIn == PayFeesIn.LINK ? i_link : address(0)
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external override returns (bytes4) {
+        // TODO - fix decode data send with calldata
+        (uint originalGameId, uint destinationGameId, uint destinationChainSelector) = abi.decode(data, (uint,uint,uint));
+
+        locked[from][msg.sender][tokenId] = NFTBridgeLocked({
+            tokenId: tokenId,
+            originalGameId: originalGameId,
+            destinationGameId: destinationGameId,
+            destinationChainSelector: destinationChainSelector
         });
 
-        uint256 fee = IRouterClient(i_router).getFee(
-            destinationChainSelector,
-            message
-        );
+        emit NFTBridgeInitiated(from, msg.sender, tokenId, originalGameId, destinationGameId, destinationChainSelector);
 
-        bytes32 messageId;
+        return this.onERC721Received.selector;
+    }
 
-        if (payFeesIn == PayFeesIn.LINK) {
-            // LinkTokenInterface(i_link).approve(i_router, fee);
-            messageId = IRouterClient(i_router).ccipSend(
-                destinationChainSelector,
-                message
-            );
-        } else {
-            messageId = IRouterClient(i_router).ccipSend{value: fee}(
-                destinationChainSelector,
-                message
-            );
+    function unlock(
+        address receiver,
+        address nft,
+        uint tokenId,
+        uint destinationChainSelector
+    ) external {
+        require(msg.sender == i_router);
+
+        NFTBridgeLocked memory nftLocked = locked[receiver][nft][tokenId];
+
+        if (nftLocked.destinationChainSelector == destinationChainSelector) {
+            IERC721(nft).safeTransferFrom(address(this), receiver, tokenId);
+
+            emit NFTBridgeUnLocked(receiver, nft, tokenId, nftLocked.originalGameId, nftLocked.destinationGameId);
         }
-
-        emit MessageSent(messageId);
     }
 }

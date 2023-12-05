@@ -25,66 +25,58 @@ import type {
 
 export interface SourceMinterInterface extends Interface {
   getFunction(
-    nameOrSignature:
-      | "acceptOwnership"
-      | "mint"
-      | "owner"
-      | "transferOwnership"
-      | "withdraw"
-      | "withdrawToken"
+    nameOrSignature: "locked" | "onERC721Received" | "unlock"
   ): FunctionFragment;
 
   getEvent(
-    nameOrSignatureOrTopic:
-      | "MessageSent"
-      | "OwnershipTransferRequested"
-      | "OwnershipTransferred"
+    nameOrSignatureOrTopic: "NFTBridgeInitiated" | "NFTBridgeUnLocked"
   ): EventFragment;
 
   encodeFunctionData(
-    functionFragment: "acceptOwnership",
-    values?: undefined
+    functionFragment: "locked",
+    values: [AddressLike, AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "mint",
-    values: [BigNumberish, AddressLike, BigNumberish]
-  ): string;
-  encodeFunctionData(functionFragment: "owner", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "transferOwnership",
-    values: [AddressLike]
+    functionFragment: "onERC721Received",
+    values: [AddressLike, AddressLike, BigNumberish, BytesLike]
   ): string;
   encodeFunctionData(
-    functionFragment: "withdraw",
-    values: [AddressLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "withdrawToken",
-    values: [AddressLike, AddressLike]
+    functionFragment: "unlock",
+    values: [AddressLike, AddressLike, BigNumberish, BigNumberish]
   ): string;
 
+  decodeFunctionResult(functionFragment: "locked", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "acceptOwnership",
+    functionFragment: "onERC721Received",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "mint", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "transferOwnership",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "withdrawToken",
-    data: BytesLike
-  ): Result;
+  decodeFunctionResult(functionFragment: "unlock", data: BytesLike): Result;
 }
 
-export namespace MessageSentEvent {
-  export type InputTuple = [messageId: BytesLike];
-  export type OutputTuple = [messageId: string];
+export namespace NFTBridgeInitiatedEvent {
+  export type InputTuple = [
+    user: AddressLike,
+    nftAddr: AddressLike,
+    tokenId: BigNumberish,
+    originalGameId: BigNumberish,
+    destinationGameId: BigNumberish,
+    destinationChainSelector: BigNumberish
+  ];
+  export type OutputTuple = [
+    user: string,
+    nftAddr: string,
+    tokenId: bigint,
+    originalGameId: bigint,
+    destinationGameId: bigint,
+    destinationChainSelector: bigint
+  ];
   export interface OutputObject {
-    messageId: string;
+    user: string;
+    nftAddr: string;
+    tokenId: bigint;
+    originalGameId: bigint;
+    destinationGameId: bigint;
+    destinationChainSelector: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -92,25 +84,27 @@ export namespace MessageSentEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
-export namespace OwnershipTransferRequestedEvent {
-  export type InputTuple = [from: AddressLike, to: AddressLike];
-  export type OutputTuple = [from: string, to: string];
+export namespace NFTBridgeUnLockedEvent {
+  export type InputTuple = [
+    user: AddressLike,
+    nftAddr: AddressLike,
+    tokenId: BigNumberish,
+    originalGameId: BigNumberish,
+    destinationGameId: BigNumberish
+  ];
+  export type OutputTuple = [
+    user: string,
+    nftAddr: string,
+    tokenId: bigint,
+    originalGameId: bigint,
+    destinationGameId: bigint
+  ];
   export interface OutputObject {
-    from: string;
-    to: string;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
-export namespace OwnershipTransferredEvent {
-  export type InputTuple = [from: AddressLike, to: AddressLike];
-  export type OutputTuple = [from: string, to: string];
-  export interface OutputObject {
-    from: string;
-    to: string;
+    user: string;
+    nftAddr: string;
+    tokenId: bigint;
+    originalGameId: bigint;
+    destinationGameId: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -161,34 +155,37 @@ export interface SourceMinter extends BaseContract {
     event?: TCEvent
   ): Promise<this>;
 
-  acceptOwnership: TypedContractMethod<[], [void], "nonpayable">;
-
-  mint: TypedContractMethod<
+  locked: TypedContractMethod<
+    [arg0: AddressLike, arg1: AddressLike, arg2: BigNumberish],
     [
-      destinationChainSelector: BigNumberish,
-      receiver: AddressLike,
-      payFeesIn: BigNumberish
+      [bigint, bigint, bigint, bigint] & {
+        tokenId: bigint;
+        originalGameId: bigint;
+        destinationGameId: bigint;
+        destinationChainSelector: bigint;
+      }
     ],
-    [void],
+    "view"
+  >;
+
+  onERC721Received: TypedContractMethod<
+    [
+      operator: AddressLike,
+      from: AddressLike,
+      tokenId: BigNumberish,
+      data: BytesLike
+    ],
+    [string],
     "nonpayable"
   >;
 
-  owner: TypedContractMethod<[], [string], "view">;
-
-  transferOwnership: TypedContractMethod<
-    [to: AddressLike],
-    [void],
-    "nonpayable"
-  >;
-
-  withdraw: TypedContractMethod<
-    [beneficiary: AddressLike],
-    [void],
-    "nonpayable"
-  >;
-
-  withdrawToken: TypedContractMethod<
-    [beneficiary: AddressLike, token: AddressLike],
+  unlock: TypedContractMethod<
+    [
+      receiver: AddressLike,
+      nft: AddressLike,
+      tokenId: BigNumberish,
+      destinationChainSelector: BigNumberish
+    ],
     [void],
     "nonpayable"
   >;
@@ -198,90 +195,80 @@ export interface SourceMinter extends BaseContract {
   ): T;
 
   getFunction(
-    nameOrSignature: "acceptOwnership"
-  ): TypedContractMethod<[], [void], "nonpayable">;
+    nameOrSignature: "locked"
+  ): TypedContractMethod<
+    [arg0: AddressLike, arg1: AddressLike, arg2: BigNumberish],
+    [
+      [bigint, bigint, bigint, bigint] & {
+        tokenId: bigint;
+        originalGameId: bigint;
+        destinationGameId: bigint;
+        destinationChainSelector: bigint;
+      }
+    ],
+    "view"
+  >;
   getFunction(
-    nameOrSignature: "mint"
+    nameOrSignature: "onERC721Received"
   ): TypedContractMethod<
     [
-      destinationChainSelector: BigNumberish,
+      operator: AddressLike,
+      from: AddressLike,
+      tokenId: BigNumberish,
+      data: BytesLike
+    ],
+    [string],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "unlock"
+  ): TypedContractMethod<
+    [
       receiver: AddressLike,
-      payFeesIn: BigNumberish
+      nft: AddressLike,
+      tokenId: BigNumberish,
+      destinationChainSelector: BigNumberish
     ],
     [void],
     "nonpayable"
   >;
-  getFunction(
-    nameOrSignature: "owner"
-  ): TypedContractMethod<[], [string], "view">;
-  getFunction(
-    nameOrSignature: "transferOwnership"
-  ): TypedContractMethod<[to: AddressLike], [void], "nonpayable">;
-  getFunction(
-    nameOrSignature: "withdraw"
-  ): TypedContractMethod<[beneficiary: AddressLike], [void], "nonpayable">;
-  getFunction(
-    nameOrSignature: "withdrawToken"
-  ): TypedContractMethod<
-    [beneficiary: AddressLike, token: AddressLike],
-    [void],
-    "nonpayable"
-  >;
 
   getEvent(
-    key: "MessageSent"
+    key: "NFTBridgeInitiated"
   ): TypedContractEvent<
-    MessageSentEvent.InputTuple,
-    MessageSentEvent.OutputTuple,
-    MessageSentEvent.OutputObject
+    NFTBridgeInitiatedEvent.InputTuple,
+    NFTBridgeInitiatedEvent.OutputTuple,
+    NFTBridgeInitiatedEvent.OutputObject
   >;
   getEvent(
-    key: "OwnershipTransferRequested"
+    key: "NFTBridgeUnLocked"
   ): TypedContractEvent<
-    OwnershipTransferRequestedEvent.InputTuple,
-    OwnershipTransferRequestedEvent.OutputTuple,
-    OwnershipTransferRequestedEvent.OutputObject
-  >;
-  getEvent(
-    key: "OwnershipTransferred"
-  ): TypedContractEvent<
-    OwnershipTransferredEvent.InputTuple,
-    OwnershipTransferredEvent.OutputTuple,
-    OwnershipTransferredEvent.OutputObject
+    NFTBridgeUnLockedEvent.InputTuple,
+    NFTBridgeUnLockedEvent.OutputTuple,
+    NFTBridgeUnLockedEvent.OutputObject
   >;
 
   filters: {
-    "MessageSent(bytes32)": TypedContractEvent<
-      MessageSentEvent.InputTuple,
-      MessageSentEvent.OutputTuple,
-      MessageSentEvent.OutputObject
+    "NFTBridgeInitiated(address,address,uint256,uint256,uint256,uint256)": TypedContractEvent<
+      NFTBridgeInitiatedEvent.InputTuple,
+      NFTBridgeInitiatedEvent.OutputTuple,
+      NFTBridgeInitiatedEvent.OutputObject
     >;
-    MessageSent: TypedContractEvent<
-      MessageSentEvent.InputTuple,
-      MessageSentEvent.OutputTuple,
-      MessageSentEvent.OutputObject
-    >;
-
-    "OwnershipTransferRequested(address,address)": TypedContractEvent<
-      OwnershipTransferRequestedEvent.InputTuple,
-      OwnershipTransferRequestedEvent.OutputTuple,
-      OwnershipTransferRequestedEvent.OutputObject
-    >;
-    OwnershipTransferRequested: TypedContractEvent<
-      OwnershipTransferRequestedEvent.InputTuple,
-      OwnershipTransferRequestedEvent.OutputTuple,
-      OwnershipTransferRequestedEvent.OutputObject
+    NFTBridgeInitiated: TypedContractEvent<
+      NFTBridgeInitiatedEvent.InputTuple,
+      NFTBridgeInitiatedEvent.OutputTuple,
+      NFTBridgeInitiatedEvent.OutputObject
     >;
 
-    "OwnershipTransferred(address,address)": TypedContractEvent<
-      OwnershipTransferredEvent.InputTuple,
-      OwnershipTransferredEvent.OutputTuple,
-      OwnershipTransferredEvent.OutputObject
+    "NFTBridgeUnLocked(address,address,uint256,uint256,uint256)": TypedContractEvent<
+      NFTBridgeUnLockedEvent.InputTuple,
+      NFTBridgeUnLockedEvent.OutputTuple,
+      NFTBridgeUnLockedEvent.OutputObject
     >;
-    OwnershipTransferred: TypedContractEvent<
-      OwnershipTransferredEvent.InputTuple,
-      OwnershipTransferredEvent.OutputTuple,
-      OwnershipTransferredEvent.OutputObject
+    NFTBridgeUnLocked: TypedContractEvent<
+      NFTBridgeUnLockedEvent.InputTuple,
+      NFTBridgeUnLockedEvent.OutputTuple,
+      NFTBridgeUnLockedEvent.OutputObject
     >;
   };
 }

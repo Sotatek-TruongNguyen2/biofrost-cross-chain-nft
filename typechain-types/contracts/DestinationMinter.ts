@@ -3,207 +3,202 @@
 /* eslint-disable */
 import type {
   BaseContract,
-  BigNumber,
   BigNumberish,
   BytesLike,
-  CallOverrides,
-  ContractTransaction,
-  Overrides,
-  PopulatedTransaction,
-  Signer,
-  utils,
-} from "ethers";
-import type {
   FunctionFragment,
   Result,
+  Interface,
   EventFragment,
-} from "@ethersproject/abi";
-import type { Listener, Provider } from "@ethersproject/providers";
+  AddressLike,
+  ContractRunner,
+  ContractMethod,
+  Listener,
+} from "ethers";
 import type {
-  TypedEventFilter,
-  TypedEvent,
+  TypedContractEvent,
+  TypedDeferredTopicFilter,
+  TypedEventLog,
+  TypedLogDescription,
   TypedListener,
-  OnEvent,
-  PromiseOrValue,
+  TypedContractMethod,
 } from "../common";
 
-export declare namespace Client {
-  export type EVMTokenAmountStruct = {
-    token: PromiseOrValue<string>;
-    amount: PromiseOrValue<BigNumberish>;
-  };
-
-  export type EVMTokenAmountStructOutput = [string, BigNumber] & {
-    token: string;
-    amount: BigNumber;
-  };
-
-  export type Any2EVMMessageStruct = {
-    messageId: PromiseOrValue<BytesLike>;
-    sourceChainSelector: PromiseOrValue<BigNumberish>;
-    sender: PromiseOrValue<BytesLike>;
-    data: PromiseOrValue<BytesLike>;
-    destTokenAmounts: Client.EVMTokenAmountStruct[];
-  };
-
-  export type Any2EVMMessageStructOutput = [
-    string,
-    BigNumber,
-    string,
-    string,
-    Client.EVMTokenAmountStructOutput[]
-  ] & {
-    messageId: string;
-    sourceChainSelector: BigNumber;
-    sender: string;
-    data: string;
-    destTokenAmounts: Client.EVMTokenAmountStructOutput[];
-  };
-}
-
-export interface DestinationMinterInterface extends utils.Interface {
-  functions: {
-    "ccipReceive((bytes32,uint64,bytes,bytes,(address,uint256)[]))": FunctionFragment;
-    "getRouter()": FunctionFragment;
-    "supportsInterface(bytes4)": FunctionFragment;
-  };
-
+export interface DestinationMinterInterface extends Interface {
   getFunction(
-    nameOrSignatureOrTopic: "ccipReceive" | "getRouter" | "supportsInterface"
+    nameOrSignature: "onERC721Received" | "receiveNFT"
   ): FunctionFragment;
 
+  getEvent(
+    nameOrSignatureOrTopic: "MintCallSuccessfull" | "NFTBridgeBackInitiated"
+  ): EventFragment;
+
   encodeFunctionData(
-    functionFragment: "ccipReceive",
-    values: [Client.Any2EVMMessageStruct]
+    functionFragment: "onERC721Received",
+    values: [AddressLike, AddressLike, BigNumberish, BytesLike]
   ): string;
-  encodeFunctionData(functionFragment: "getRouter", values?: undefined): string;
   encodeFunctionData(
-    functionFragment: "supportsInterface",
-    values: [PromiseOrValue<BytesLike>]
+    functionFragment: "receiveNFT",
+    values: [AddressLike, BigNumberish]
   ): string;
 
   decodeFunctionResult(
-    functionFragment: "ccipReceive",
+    functionFragment: "onERC721Received",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "getRouter", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "supportsInterface",
-    data: BytesLike
-  ): Result;
-
-  events: {
-    "MintCallSuccessfull()": EventFragment;
-  };
-
-  getEvent(nameOrSignatureOrTopic: "MintCallSuccessfull"): EventFragment;
+  decodeFunctionResult(functionFragment: "receiveNFT", data: BytesLike): Result;
 }
 
-export interface MintCallSuccessfullEventObject {}
-export type MintCallSuccessfullEvent = TypedEvent<
-  [],
-  MintCallSuccessfullEventObject
->;
+export namespace MintCallSuccessfullEvent {
+  export type InputTuple = [receiver: AddressLike, tokenId: BigNumberish];
+  export type OutputTuple = [receiver: string, tokenId: bigint];
+  export interface OutputObject {
+    receiver: string;
+    tokenId: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
 
-export type MintCallSuccessfullEventFilter =
-  TypedEventFilter<MintCallSuccessfullEvent>;
+export namespace NFTBridgeBackInitiatedEvent {
+  export type InputTuple = [
+    user: AddressLike,
+    nftAddr: AddressLike,
+    tokenId: BigNumberish
+  ];
+  export type OutputTuple = [user: string, nftAddr: string, tokenId: bigint];
+  export interface OutputObject {
+    user: string;
+    nftAddr: string;
+    tokenId: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
 
 export interface DestinationMinter extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this;
-  attach(addressOrName: string): this;
-  deployed(): Promise<this>;
+  connect(runner?: ContractRunner | null): DestinationMinter;
+  waitForDeployment(): Promise<this>;
 
   interface: DestinationMinterInterface;
 
-  queryFilter<TEvent extends TypedEvent>(
-    event: TypedEventFilter<TEvent>,
+  queryFilter<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
     fromBlockOrBlockhash?: string | number | undefined,
     toBlock?: string | number | undefined
-  ): Promise<Array<TEvent>>;
+  ): Promise<Array<TypedEventLog<TCEvent>>>;
+  queryFilter<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    fromBlockOrBlockhash?: string | number | undefined,
+    toBlock?: string | number | undefined
+  ): Promise<Array<TypedEventLog<TCEvent>>>;
 
-  listeners<TEvent extends TypedEvent>(
-    eventFilter?: TypedEventFilter<TEvent>
-  ): Array<TypedListener<TEvent>>;
-  listeners(eventName?: string): Array<Listener>;
-  removeAllListeners<TEvent extends TypedEvent>(
-    eventFilter: TypedEventFilter<TEvent>
-  ): this;
-  removeAllListeners(eventName?: string): this;
-  off: OnEvent<this>;
-  on: OnEvent<this>;
-  once: OnEvent<this>;
-  removeListener: OnEvent<this>;
+  on<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
+  on<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
 
-  functions: {
-    ccipReceive(
-      message: Client.Any2EVMMessageStruct,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<ContractTransaction>;
+  once<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
+  once<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
 
-    getRouter(overrides?: CallOverrides): Promise<[string]>;
+  listeners<TCEvent extends TypedContractEvent>(
+    event: TCEvent
+  ): Promise<Array<TypedListener<TCEvent>>>;
+  listeners(eventName?: string): Promise<Array<Listener>>;
+  removeAllListeners<TCEvent extends TypedContractEvent>(
+    event?: TCEvent
+  ): Promise<this>;
 
-    supportsInterface(
-      interfaceId: PromiseOrValue<BytesLike>,
-      overrides?: CallOverrides
-    ): Promise<[boolean]>;
-  };
+  onERC721Received: TypedContractMethod<
+    [
+      operator: AddressLike,
+      from: AddressLike,
+      tokenId: BigNumberish,
+      data: BytesLike
+    ],
+    [string],
+    "nonpayable"
+  >;
 
-  ccipReceive(
-    message: Client.Any2EVMMessageStruct,
-    overrides?: Overrides & { from?: PromiseOrValue<string> }
-  ): Promise<ContractTransaction>;
+  receiveNFT: TypedContractMethod<
+    [receiver: AddressLike, tokenId: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
 
-  getRouter(overrides?: CallOverrides): Promise<string>;
+  getFunction<T extends ContractMethod = ContractMethod>(
+    key: string | FunctionFragment
+  ): T;
 
-  supportsInterface(
-    interfaceId: PromiseOrValue<BytesLike>,
-    overrides?: CallOverrides
-  ): Promise<boolean>;
+  getFunction(
+    nameOrSignature: "onERC721Received"
+  ): TypedContractMethod<
+    [
+      operator: AddressLike,
+      from: AddressLike,
+      tokenId: BigNumberish,
+      data: BytesLike
+    ],
+    [string],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "receiveNFT"
+  ): TypedContractMethod<
+    [receiver: AddressLike, tokenId: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
 
-  callStatic: {
-    ccipReceive(
-      message: Client.Any2EVMMessageStruct,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    getRouter(overrides?: CallOverrides): Promise<string>;
-
-    supportsInterface(
-      interfaceId: PromiseOrValue<BytesLike>,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-  };
+  getEvent(
+    key: "MintCallSuccessfull"
+  ): TypedContractEvent<
+    MintCallSuccessfullEvent.InputTuple,
+    MintCallSuccessfullEvent.OutputTuple,
+    MintCallSuccessfullEvent.OutputObject
+  >;
+  getEvent(
+    key: "NFTBridgeBackInitiated"
+  ): TypedContractEvent<
+    NFTBridgeBackInitiatedEvent.InputTuple,
+    NFTBridgeBackInitiatedEvent.OutputTuple,
+    NFTBridgeBackInitiatedEvent.OutputObject
+  >;
 
   filters: {
-    "MintCallSuccessfull()"(): MintCallSuccessfullEventFilter;
-    MintCallSuccessfull(): MintCallSuccessfullEventFilter;
-  };
+    "MintCallSuccessfull(address,uint256)": TypedContractEvent<
+      MintCallSuccessfullEvent.InputTuple,
+      MintCallSuccessfullEvent.OutputTuple,
+      MintCallSuccessfullEvent.OutputObject
+    >;
+    MintCallSuccessfull: TypedContractEvent<
+      MintCallSuccessfullEvent.InputTuple,
+      MintCallSuccessfullEvent.OutputTuple,
+      MintCallSuccessfullEvent.OutputObject
+    >;
 
-  estimateGas: {
-    ccipReceive(
-      message: Client.Any2EVMMessageStruct,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<BigNumber>;
-
-    getRouter(overrides?: CallOverrides): Promise<BigNumber>;
-
-    supportsInterface(
-      interfaceId: PromiseOrValue<BytesLike>,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-  };
-
-  populateTransaction: {
-    ccipReceive(
-      message: Client.Any2EVMMessageStruct,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<PopulatedTransaction>;
-
-    getRouter(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    supportsInterface(
-      interfaceId: PromiseOrValue<BytesLike>,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
+    "NFTBridgeBackInitiated(address,address,uint256)": TypedContractEvent<
+      NFTBridgeBackInitiatedEvent.InputTuple,
+      NFTBridgeBackInitiatedEvent.OutputTuple,
+      NFTBridgeBackInitiatedEvent.OutputObject
+    >;
+    NFTBridgeBackInitiated: TypedContractEvent<
+      NFTBridgeBackInitiatedEvent.InputTuple,
+      NFTBridgeBackInitiatedEvent.OutputTuple,
+      NFTBridgeBackInitiatedEvent.OutputObject
+    >;
   };
 }

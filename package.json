@@ -7,5 +7,8 @@
     "@nomicfoundation/hardhat-toolbox": "^3.0.0",
     "ethers": "^6.8.1",
     "hardhat": "^2.14.1"
+  },
+  "dependencies": {
+    "hardhat-deploy": "^0.11.44"
   }
 }
